@@ -345,7 +345,7 @@ def load_index():
 def load_client():
     return InferenceClient(
         model="meta-llama/Llama-3.1-8B-Instruct",
-        token="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"
+        token="token"
     )
 
 

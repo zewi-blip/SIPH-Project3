@@ -21,7 +21,7 @@ def rag_app():
     vector_store = load_index()
     client_LLM = InferenceClient(
     model="meta-llama/Llama-3.1-8B-Instruct",
-        token="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"
+        token="Token"
     )
     while True:
         user_question = input("User: ")
