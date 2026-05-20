@@ -5,16 +5,18 @@ from radiomics import featureextractor
 import cv2
 import numpy as np
 from unet import UNet
+from unet import visualize
 
-# Load your trained segmentation model
+# load trained segmentation model
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model = UNet().to(device)  # Use your existing UNet class
 model.load_state_dict(torch.load("best_model.pth", map_location=device))
+
 model.eval()
 
 
 def predict_single_image(image_path):
-    # --- STEP 1: SEGMENTATION ---
+    # segmentation
     img_orig = cv2.imread(image_path)
     img_resized = cv2.resize(img_orig, (256, 256)) / 255.0
     img_tensor = torch.tensor(img_resized).permute(2, 0, 1).float().unsqueeze(0).to(device)
@@ -23,7 +25,22 @@ def predict_single_image(image_path):
         pred = torch.sigmoid(model(img_tensor)).cpu().squeeze().numpy()
     mask_np = (pred > 0.5).astype(np.uint8)
 
-    # --- STEP 2: RADIOMICS EXTRACTION ---
+    # 1. Resize mask to match original image size
+    mask_resized = cv2.resize(mask_np, (img_orig.shape[1], img_orig.shape[0]), interpolation=cv2.INTER_NEAREST)
+
+    # --- ADD THESE LINES TO SHOW THE CONTOUR ---
+    # Find the boundary lines in the mask
+    contours, _ = cv2.findContours(mask_resized, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Draw the boundary (Blue color in BGR is (255, 0, 0))
+    overlay = img_orig.copy()
+    cv2.drawContours(overlay, contours, -1, (255, 0, 0), 2)
+
+    # Display the result
+    cv2.imshow("Predicted Contour", overlay)
+    cv2.waitKey(0)  # Press any key to close the window and continue to LLM
+
+    # radiomics extraction
     sitk_img = sitk.ReadImage(image_path)
     if sitk_img.GetNumberOfComponentsPerPixel() > 1:
         sitk_img = sitk.VectorIndexSelectionCast(sitk_img, 0)
@@ -38,10 +55,10 @@ def predict_single_image(image_path):
     extractor.enableFeatureClassByName('shape2D')
     features = extractor.execute(sitk_img, sitk_mask)
 
-    # --- STEP 3: TRANSLATION & LLM CLASSIFICATION ---
+    # translation and & LLM classification
     sphericity = features['original_shape2D_Sphericity']
 
-    # Map to descriptors from Reference Card
+    # map to descriptors from Reference Card
     shape = "Oval" if sphericity > 0.8 else "Irregular"
     margin = "Circumscribed" if sphericity > 0.8 else "Not circumscribed"
 
@@ -56,6 +73,4 @@ def predict_single_image(image_path):
     response = ollama.generate(model='llama3', prompt=prompt)
     return response['response']
 
-
-# Usage
-print(predict_single_image("malignant (173) copy.png"))
+print(predict_single_image("cropped_output.png"))

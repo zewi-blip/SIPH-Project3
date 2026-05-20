@@ -11,7 +11,7 @@ def extract_features_to_csv(root_dir, category, output_filename):
     img_dir = os.path.join(root_dir, category)
     mask_dir = os.path.join(root_dir, f"{category}_mask")
 
-    # Initialize PyRadiomics Extractor, enable 'shape2D' specifically for ultrasound
+    # initialize PyRadiomics Extractor, enable 'shape2D' specifically for ultrasound
     extractor = featureextractor.RadiomicsFeatureExtractor()
     extractor.disableAllFeatures()
     extractor.enableFeatureClassByName('shape2D')  # mass shape
@@ -25,7 +25,7 @@ def extract_features_to_csv(root_dir, category, output_filename):
     print(f"Processing {category} images...")
 
     for fname in image_files:
-        # Match mask
+        # match mask
         base_name = os.path.splitext(fname)[0]
         mask_name = f"{base_name}_mask.png"
 
@@ -37,16 +37,16 @@ def extract_features_to_csv(root_dir, category, output_filename):
 
         sitk_img = sitk.ReadImage(img_path)
 
-        # Needs RGB images
+        # needs RGB images
         if sitk_img.GetNumberOfComponentsPerPixel() > 1:
             sitk_img = sitk.VectorIndexSelectionCast(sitk_img, 0)
 
         sitk_mask = sitk.ReadImage(mask_path)
-        # Ensure mask is binary (0 or 1)
+        # ensure mask is binary (0 or 1)
         sitk_mask = sitk.Cast(sitk_mask > 127, sitk.sitkUInt8)
 
         try:
-            # Extract features
+            # extract features
             feature_vector = extractor.execute(sitk_img, sitk_mask)
 
             row = {"ID": base_name, "Label": category}
@@ -58,7 +58,7 @@ def extract_features_to_csv(root_dir, category, output_filename):
         except Exception as e:
             print(f"Error processing {fname}: {e}")
 
-    # Save to CSV
+    # save to CSV
     if results:
         keys = results[0].keys()
         with open(output_filename, 'w', newline='') as f:

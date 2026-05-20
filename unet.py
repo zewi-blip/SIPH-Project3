@@ -8,10 +8,9 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, random_split
 
-
 DO_TRAIN = False
 DO_PLOT_CURVES = False
-DO_EVAL = False
+DO_EVAL = True
 DO_VISUALIZE = False
 DO_EXTRACT_METRICS = False
 DO_CONTOUR_OVERLAY = True

@@ -17,8 +17,10 @@ def classify_ultrasound(csv_path, label_type, output_csv="classification_results
     for index, row in df.iterrows():
         sphericity = row['original_shape2D_Sphericity']
         entropy = row['original_firstorder_Entropy']
+        color_mean = row['original_firstorder_Mean']
 
-        # Morphological logic based on BI-RADS Atlas
+
+        # morphological logic based on BI-RADS Atlas
         if sphericity > 0.90:
             shape_type = "Round"
         elif sphericity > 0.82:
@@ -26,8 +28,22 @@ def classify_ultrasound(csv_path, label_type, output_csv="classification_results
         else:
             shape_type = "Irregular"
 
+        elongation = row.get('original_shape2d_Elongation', 1.0)
+        orientation = "Parallel" if elongation > 0.5 else "Non-parallel"
+
+        if color_mean < 50:
+            color_grade = "Hypoechoic (Dark)"
+        elif entropy > 4.5:
+            color_grade = "Complex/ Mixed (Heterogenous colors)"
+        else:
+            color_grade = "Isoechoic (Neutral/Mixed)"
+
         margin_type = "Circumscribed" if sphericity > 0.88 else "Not circumscribed (Indistinct/Angular)"
-        echo_type = "Homogeneous" if entropy < 3.8 else "Heterogeneous"
+        echo_pattern = "Homogeneous" if entropy < 3.8 else "Heterogeneous"
+        #posterior_features = "Shadow if area under tumor is dark, enhancement if area under tumor is white"
+
+        #add to prompt
+        # - Posterior Features: {posterior_features}
 
         prompt = f"""
         System: You are an expert Radiologist AI using the ACR BI-RADS Atlas 5th Edition.
@@ -35,15 +51,18 @@ def classify_ultrasound(csv_path, label_type, output_csv="classification_results
         Morphological Features:
         - Shape: {shape_type}
         - Margin: {margin_type}
-        - Echo Pattern: {echo_type}
+        - Echo pattern:  {echo_pattern}
+        - Color grade: {color_grade}
+        - Orientation: {orientation}
+        
 
         Rules :
         - Category 1: Negative
-        - Category 2: Benign (Oval/Round & Circumscribed)
+        - Category 2: Benign (Oval/Round & Parallel & Circumscribed & Enhancement & Lighter/ Isoechoic)
         - Category 3: Probably Benign
-        - Category 4: Suspicious (Irregular OR Not circumscribed)
-        - Category 5: Highly Suggestive (Irregular AND Not circumscribed)
-        - Category 0: Incomplete/Artifacts
+        - Category 4: Suspicious (Irregular OR Not circumscribed & Non-parallel & Shadow & Dark/Mixed colors)
+        - Category 5: Highly Suggestive (Irregular AND Not circumscribed & Non-parallel & Shadow & Dark/ Mixed colors)
+        - Category 0: Incomplete scan or artifacts 
 
         Task: Assign a Category (0, 1, 2, 3, 4, or 5).
         Response Format:
@@ -55,18 +74,18 @@ def classify_ultrasound(csv_path, label_type, output_csv="classification_results
             response = ollama.generate(model='llama3', prompt=prompt)
             resp_text = response['response']
 
-            # Extract the category number using Regex
+            # extract the category number using Regex
             cat_match = re.search(r'Category:\s*([0-6])', resp_text)
             assigned_cat = cat_match.group(1) if cat_match else "Unknown"
 
-            # Store data for the new CSV
+            # store data for the new CSV
             all_results.append({
                 "ID": row['ID'],
                 "Original_Label": label_type,
                 "Predicted_Category": assigned_cat,
                 "Shape": shape_type,
                 "Margin": margin_type,
-                "Echo": echo_type,
+                "Echo": echo_pattern,
                 "Full_AI_Reasoning": resp_text.replace('\n', ' ')
             })
 
@@ -75,12 +94,12 @@ def classify_ultrasound(csv_path, label_type, output_csv="classification_results
         except Exception as e:
             print(f"Error processing {row['ID']}: {e}")
 
-    # 1. Save all results to a new CSV
+    # save all results to a new CSV
     results_df = pd.DataFrame(all_results)
     results_df.to_csv(output_csv, index=False)
     print(f"\n--- Success! Results saved to {output_csv} ---")
 
-    # 2. Print summary of classifications
+    # print summary of classifications
     print("\nTotal Classification Counts:")
     print(results_df['Predicted_Category'].value_counts().sort_index())
 
