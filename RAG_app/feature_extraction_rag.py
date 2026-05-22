@@ -40,6 +40,8 @@ def _bb_key_from_path(image_path):
 def predict_single_image(image_path):
     # --- STEP 1: SEGMENTATION ---
     img_orig = cv2.imread(image_path)
+    if img_orig is None:
+        raise ValueError(f"Could not read image: {image_path}")
 
     # Crop to bounding box if available
     bb_key = _bb_key_from_path(image_path)
