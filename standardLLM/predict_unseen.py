@@ -97,7 +97,7 @@ def lookup_posterior_features(image_path, csv_path):
 def process_and_classify_image(
     image_path, mask_path, reference_csv, cropper_obj
 ):
-    # read Original Files
+    # read original files
     img_orig = cv2.imread(image_path)
     if img_orig is None:
         raise FileNotFoundError(
