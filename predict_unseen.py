@@ -10,13 +10,12 @@ import torch
 from radiomics import featureextractor
 from unet import UNet
 
-# --- The Numpy Pickle Workaround ---
 if "numpy._core" not in sys.modules:
     sys.modules["numpy._core"] = np.core
 if "numpy._core.multiarray" not in sys.modules:
     sys.modules["numpy._core.multiarray"] = np.core.multiarray
 
-# Load trained segmentation model
+# load trained segmentation model
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model = UNet().to(device)
 checkpoint = torch.load("final_model.pth", map_location=device)
@@ -60,7 +59,6 @@ class ImageCropper:
         x_min, y_min = max(0, x_min), max(0, y_min)
         x_max, y_max = min(w, x_max), min(h, y_max)
 
-        # Handle grayscale mask dimensions safely
         if mask is not None:
             return (
                 img[y_min:y_max, x_min:x_max],
@@ -99,7 +97,7 @@ def lookup_posterior_features(image_path, csv_path):
 def process_and_classify_image(
     image_path, mask_path, reference_csv, cropper_obj
 ):
-    # --- Step 1: Read Original Files ---
+    # read Original Files
     img_orig = cv2.imread(image_path)
     if img_orig is None:
         raise FileNotFoundError(
@@ -110,12 +108,12 @@ def process_and_classify_image(
         cv2.imread(mask_path, 0) if os.path.exists(mask_path) else None
     )
 
-    # --- Step 2: Crop Using bounding boxes ---
+    # crop using bounding boxes
     img_cropped, _ = cropper_obj.crop_by_filename(
         img_orig, mask_orig, image_path
     )
 
-    # --- Step 3: Segmentation Pipeline (U-Net) ---
+    # segmentation using unet
     img_resized = cv2.resize(img_cropped, (256, 256)) / 255.0
     img_tensor = (
         torch.tensor(img_resized).permute(2, 0, 1).float().unsqueeze(0).to(device)
@@ -125,7 +123,7 @@ def process_and_classify_image(
         pred = torch.sigmoid(model(img_tensor)).cpu().squeeze().numpy()
     mask_np = (pred > 0.5).astype(np.uint8)
 
-    # Scale the U-Net mask output to match the cropped image coordinates
+    # scaling unet mask
     mask_resized = cv2.resize(
         mask_np,
         (img_cropped.shape[1], img_cropped.shape[0]),
@@ -146,8 +144,6 @@ def process_and_classify_image(
     cv2.destroyAllWindows()
     '''
 
-    # --- Step 5: Radiomics Feature Extraction (Using memory arrays) ---
-    # Convert OpenCV image array (BGR -> Gray) directly to a SimpleITK image
     gray_cropped = cv2.cvtColor(img_cropped, cv2.COLOR_BGR2GRAY)
     sitk_img = sitk.GetImageFromArray(gray_cropped)
     sitk_mask = sitk.GetImageFromArray(mask_resized)
@@ -160,7 +156,7 @@ def process_and_classify_image(
 
     features = extractor.execute(sitk_img, sitk_mask)
 
-    # Extract metrics & map descriptors
+    # extract metrics & map descriptors
     sphericity = features["original_shape2D_Sphericity"]
     entropy = features["original_firstorder_Entropy"]
     color_mean = features["original_firstorder_Mean"]
@@ -189,7 +185,6 @@ def process_and_classify_image(
     )
     echo_pattern = "Homogeneous" if entropy < 3.8 else "Heterogeneous"
 
-    # --- Step 6: Database Lookup & Execution ---
     posterior_features = lookup_posterior_features(image_path, reference_csv)
     patient_id = os.path.splitext(os.path.basename(image_path))[0]
 
@@ -223,19 +218,16 @@ def process_and_classify_image(
 
 
 if __name__ == "__main__":
-    # 1. Initialize Cropper Engine once
+
     cropper = ImageCropper("ground_truth_boxes.npy")
 
-    # 2. Configure paths for ANY targeted file you wish to run
     img_name = "malignant (104).png"
     target_csv = "malignant_features.csv"  # matches the file type
 
-    # Derive mask location dynamically matching your folder pattern
     mask_name = img_name.replace(".png", "_mask.png")
     mask_path_target = f"/Users/zozo/Desktop/unimib/SIPH/Project 2/malignant_mask/{mask_name}"
 
     try:
-        # Run execution pipeline
         result = process_and_classify_image(
             image_path=img_name,
             mask_path=mask_path_target,
