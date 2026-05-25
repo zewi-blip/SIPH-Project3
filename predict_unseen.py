@@ -132,6 +132,7 @@ def process_and_classify_image(
         interpolation=cv2.INTER_NEAREST,
     )
 
+    '''
     # --- Step 4: Visualize Contour ---
     contours, _ = cv2.findContours(
         mask_resized, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
@@ -143,6 +144,7 @@ def process_and_classify_image(
     print("Close the image window to proceed to AI Classification...")
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+    '''
 
     # --- Step 5: Radiomics Feature Extraction (Using memory arrays) ---
     # Convert OpenCV image array (BGR -> Gray) directly to a SimpleITK image
@@ -213,7 +215,7 @@ def process_and_classify_image(
     Task: Assign a Category (0, 1, 2, 3, 4, or 5).
     Response Format:
     Category: [Score]
-    Reasoning: [One sentence]
+    Reasoning: [One sentence, including all important morphological features]
     """
 
     response = ollama.generate(model="llama3", prompt=prompt)
@@ -225,7 +227,7 @@ if __name__ == "__main__":
     cropper = ImageCropper("ground_truth_boxes.npy")
 
     # 2. Configure paths for ANY targeted file you wish to run
-    img_name = "malignant (9).png"
+    img_name = "malignant (104).png"
     target_csv = "malignant_features.csv"  # matches the file type
 
     # Derive mask location dynamically matching your folder pattern
